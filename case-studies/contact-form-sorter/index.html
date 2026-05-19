@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Contact Form Sorter — Case Study</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #232733;
+    --border: #2e3343;
+    --text: #e4e6ed;
+    --text-muted: #8b8fa3;
+    --accent: #6366f1;
+    --accent-glow: rgba(99, 102, 241, 0.15);
+    --green: #22c55e;
+    --orange: #f59e0b;
+    --red: #ef4444;
+    --blue: #3b82f6;
+    --radius: 12px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* ── Hero ── */
+  .hero {
+    padding: 80px 24px 60px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -200px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 800px;
+    height: 800px;
+    background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero h1 {
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin-bottom: 16px;
+    position: relative;
+  }
+  .hero .subtitle {
+    font-size: 1.15rem;
+    color: var(--text-muted);
+    max-width: 640px;
+    margin: 0 auto 32px;
+    position: relative;
+  }
+  .badge-row {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    position: relative;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    background: var(--surface);
+    border: 1px solid var(--border);
+  }
+  .badge .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+  }
+  .badge .dot.green { background: var(--green); }
+  .badge .dot.blue { background: var(--blue); }
+  .badge .dot.orange { background: var(--orange); }
+  .badge .dot.purple { background: var(--accent); }
+
+  /* ── Container ── */
+  .container {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* ── Section ── */
+  .section {
+    margin-bottom: 64px;
+  }
+  .section-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  .section h2 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin-bottom: 16px;
+    letter-spacing: -0.02em;
+  }
+  .section p {
+    color: var(--text-muted);
+    max-width: 720px;
+  }
+
+  /* ── Workflow Diagram ── */
+  .workflow-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+    margin: 32px 0;
+    overflow-x: auto;
+  }
+  .workflow-canvas {
+    min-width: 900px;
+  }
+  .workflow-container .caption {
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 20px;
+    font-style: italic;
+  }
+
+  /* ── Interactive Flowchart ── */
+  .flowchart {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin: 32px 0;
+  }
+  .flow-step {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .flow-step:hover .step-card {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .flow-connector {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 48px;
+    padding-top: 4px;
+  }
+  .step-num {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+  }
+  .step-num.webhook { background: var(--blue); color: white; }
+  .step-num.ai { background: var(--accent); color: white; }
+  .step-num.router { background: var(--orange); color: white; }
+  .step-num.slack { background: #e01e5a; color: white; }
+  .step-num.db { background: var(--green); color: white; }
+  .step-num.ack { background: #8b5cf6; color: white; }
+  .connector-line {
+    width: 2px;
+    height: 32px;
+    background: var(--border);
+  }
+  .step-card {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin-bottom: 12px;
+    transition: all 0.2s;
+  }
+  .step-card h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .step-card p {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    margin-bottom: 0;
+  }
+  .step-detail {
+    display: none;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    font-size: 0.84rem;
+    color: var(--text-muted);
+  }
+  .step-detail.open {
+    display: block;
+    animation: fadeIn 0.2s ease;
+  }
+  .step-detail code {
+    background: var(--bg);
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    color: var(--green);
+  }
+
+  /* ── Tech Stack Grid ── */
+  .stack-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-top: 24px;
+  }
+  .stack-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+  .stack-card .stack-icon {
+    font-size: 1.5rem;
+    margin-bottom: 8px;
+  }
+  .stack-card h4 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .stack-card p {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  /* ── Classification Demo ── */
+  .demo-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin: 24px 0;
+  }
+  .demo-header {
+    padding: 16px 24px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .demo-header .live-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s infinite;
+  }
+  .demo-body {
+    padding: 24px;
+  }
+  .demo-input {
+    margin-bottom: 20px;
+  }
+  .demo-input label {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    display: block;
+    margin-bottom: 6px;
+  }
+  .demo-input textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.9rem;
+    resize: vertical;
+    min-height: 80px;
+  }
+  .demo-input textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .demo-btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.88rem;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .demo-btn:hover { opacity: 0.85; }
+  .demo-btn:disabled { opacity: 0.5; cursor: wait; }
+  .demo-result {
+    margin-top: 20px;
+    display: none;
+  }
+  .demo-result.show { display: block; animation: fadeIn 0.3s ease; }
+  .result-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+  }
+  .result-item {
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 14px;
+  }
+  .result-item .label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+  .result-item .value {
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+  .urgency-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  .urgency-critical { background: rgba(239,68,68,0.15); color: var(--red); }
+  .urgency-high { background: rgba(245,158,11,0.15); color: var(--orange); }
+  .urgency-medium { background: rgba(59,130,246,0.15); color: var(--blue); }
+  .urgency-low { background: rgba(34,197,94,0.15); color: var(--green); }
+
+  /* ── Code Block ── */
+  .code-block {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin: 24px 0;
+  }
+  .code-header {
+    padding: 10px 16px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .code-header button {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    cursor: pointer;
+  }
+  .code-header button:hover { color: var(--text); border-color: var(--text-muted); }
+  .code-body {
+    padding: 16px;
+    overflow-x: auto;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.78rem;
+    line-height: 1.7;
+    color: var(--text-muted);
+    white-space: pre;
+    max-height: 360px;
+    overflow-y: auto;
+  }
+  .code-body .kw { color: #c084fc; }
+  .code-body .str { color: #86efac; }
+  .code-body .cm { color: #6b7280; }
+
+  /* ── Decision Table ── */
+  .decision-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 24px 0;
+    font-size: 0.85rem;
+  }
+  .decision-table th {
+    text-align: left;
+    padding: 12px 16px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+  }
+  .decision-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+  .decision-table tr:hover td {
+    background: var(--surface);
+  }
+
+  /* ── Footer ── */
+  .footer {
+    text-align: center;
+    padding: 48px 24px;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+  .footer a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  /* ── Animations ── */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 640px) {
+    .hero { padding: 48px 16px 40px; }
+    .workflow-container { padding: 16px; }
+    .result-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══ HERO ═══ -->
+<header class="hero">
+  <h1>AI Contact Form Sorter</h1>
+  <p class="subtitle">An n8n workflow that uses Claude to automatically classify, prioritize, and route incoming contact form submissions — before they ever reach your inbox.</p>
+  <div class="badge-row">
+    <span class="badge"><span class="dot green"></span> n8n</span>
+    <span class="badge"><span class="dot purple"></span> Claude AI</span>
+    <span class="badge"><span class="dot blue"></span> Supabase</span>
+    <span class="badge"><span class="dot orange"></span> Slack</span>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- ═══ SUMMARY ═══ -->
+  <div class="section">
+    <div class="section-label">Overview</div>
+    <h2>What This Does</h2>
+    <p>Contact form submissions hit a webhook, get analyzed by Claude for intent, category, and urgency, then get routed accordingly. High-priority items trigger an immediate Slack alert. Everything gets logged to Supabase. The submitter receives an instant acknowledgment. One endpoint, one model call, one clean path — designed to be minimal and practical.</p>
+  </div>
+
+  <!-- ═══ WORKFLOW DIAGRAM (SVG) ═══ -->
+  <div class="section">
+    <div class="section-label">Architecture</div>
+    <h2>Workflow Canvas</h2>
+    <div class="workflow-container">
+      <div class="workflow-canvas">
+        <svg viewBox="0 0 1000 420" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">
+          <!-- Connection Lines -->
+          <defs>
+            <marker id="arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+              <path d="M0,0 L8,3 L0,6" fill="none" stroke="#4b5563" stroke-width="1.2"/>
+            </marker>
+          </defs>
+
+          <!-- Webhook → AI Agent -->
+          <path d="M175,175 L270,175" stroke="#4b5563" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+          <!-- AI Agent → Priority Router -->
+          <path d="M455,175 L550,175" stroke="#4b5563" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+          <!-- Priority Router → Slack (true) -->
+          <path d="M700,155 L760,120 L790,120" stroke="#4b5563" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+          <!-- Priority Router → Supabase (false) -->
+          <path d="M700,195 L760,240 L790,240" stroke="#4b5563" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+          <!-- Supabase → Acknowledge -->
+          <path d="M945,240 L790,340" stroke="#4b5563" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+          <!-- AI Agent → subnodes (dashed) -->
+          <line x1="340" y1="225" x2="340" y2="290" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="4,3"/>
+          <line x1="420" y1="225" x2="420" y2="290" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+          <!-- ── Node 1: Webhook ── -->
+          <g transform="translate(30,130)">
+            <rect width="145" height="90" rx="10" fill="#1e2433" stroke="#3b82f6" stroke-width="2"/>
+            <rect width="145" height="28" rx="10" fill="#3b82f6" opacity="0.15"/>
+            <text x="72" y="18" text-anchor="middle" fill="#3b82f6" font-size="10" font-weight="600">TRIGGER</text>
+            <text x="72" y="46" text-anchor="middle" fill="#e4e6ed" font-size="11.5" font-weight="600">Incoming</text>
+            <text x="72" y="62" text-anchor="middle" fill="#e4e6ed" font-size="11.5" font-weight="600">Contact Form</text>
+            <text x="72" y="80" text-anchor="middle" fill="#8b8fa3" font-size="9">POST /contact-intake</text>
+          </g>
+
+          <!-- ── Node 2: AI Agent ── -->
+          <g transform="translate(280,130)">
+            <rect width="170" height="90" rx="10" fill="#1e2433" stroke="#6366f1" stroke-width="2"/>
+            <rect width="170" height="28" rx="10" fill="#6366f1" opacity="0.15"/>
+            <text x="85" y="18" text-anchor="middle" fill="#6366f1" font-size="10" font-weight="600">AI AGENT</text>
+            <text x="85" y="46" text-anchor="middle" fill="#e4e6ed" font-size="11.5" font-weight="600">Claude Intent</text>
+            <text x="85" y="62" text-anchor="middle" fill="#e4e6ed" font-size="11.5" font-weight="600">Classification</text>
+            <text x="85" y="80" text-anchor="middle" fill="#8b8fa3" font-size="9">claude-sonnet-4 · temp 0.1</text>
+          </g>
+
+          <!-- ── Subnode: Model ── -->
+          <g transform="translate(295,295)">
+            <rect width="80" height="48" rx="6" fill="#1e2433" stroke="#6366f1" stroke-width="1" stroke-dasharray="4,2"/>
+            <text x="40" y="18" text-anchor="middle" fill="#8b8fa3" font-size="8" font-weight="500">MODEL</text>
+            <text x="40" y="34" text-anchor="middle" fill="#a5b4fc" font-size="9" font-weight="500">Claude API</text>
+          </g>
+
+          <!-- ── Subnode: Parser ── -->
+          <g transform="translate(385,295)">
+            <rect width="80" height="48" rx="6" fill="#1e2433" stroke="#6366f1" stroke-width="1" stroke-dasharray="4,2"/>
+            <text x="40" y="18" text-anchor="middle" fill="#8b8fa3" font-size="8" font-weight="500">PARSER</text>
+            <text x="40" y="34" text-anchor="middle" fill="#a5b4fc" font-size="9" font-weight="500">JSON Schema</text>
+          </g>
+
+          <!-- ── Node 3: Priority Router ── -->
+          <g transform="translate(555,130)">
+            <rect width="145" height="90" rx="10" fill="#1e2433" stroke="#f59e0b" stroke-width="2"/>
+            <rect width="145" height="28" rx="10" fill="#f59e0b" opacity="0.15"/>
+            <text x="72" y="18" text-anchor="middle" fill="#f59e0b" font-size="10" font-weight="600">ROUTER</text>
+            <text x="72" y="46" text-anchor="middle" fill="#e4e6ed" font-size="11.5" font-weight="600">Priority</text>
+            <text x="72" y="62" text-anchor="middle" fill="#e4e6ed" font-size="11.5" font-weight="600">Router</text>
+            <text x="72" y="80" text-anchor="middle" fill="#8b8fa3" font-size="9">high|critical → alert</text>
+          </g>
+
+          <!-- True/False labels -->
+          <text x="755" y="112" fill="#22c55e" font-size="9" font-weight="600">TRUE</text>
+          <text x="755" y="252" fill="#ef4444" font-size="9" font-weight="600">FALSE</text>
+
+          <!-- ── Node 4: Slack Alert ── -->
+          <g transform="translate(800,75)">
+            <rect width="160" height="90" rx="10" fill="#1e2433" stroke="#e01e5a" stroke-width="2"/>
+            <rect width="160" height="28" rx="10" fill="#e01e5a" opacity="0.15"/>
+            <text x="80" y="18" text-anchor="middle" fill="#e01e5a" font-size="10" font-weight="600">NOTIFY</text>
+            <text x="80" y="46" text-anchor="middle" fill="#e4e6ed" font-size="11.5" font-weight="600">Send High Priority</text>
+            <text x="80" y="62" text-anchor="middle" fill="#e4e6ed" font-size="11.5" font-weight="600">Slack Alert</text>
+            <text x="80" y="80" text-anchor="middle" fill="#8b8fa3" font-size="9">#urgent-inbox</text>
+          </g>
+
+          <!-- ── Node 5: Supabase ── -->
+          <g transform="translate(800,195)">
+            <rect width="145" height="90" rx="10" fill="#1e2433" stroke="#22c55e" stroke-width="2"/>
+            <rect width="145" height="28" rx="10" fill="#22c55e" opacity="0.15"/>
+            <text x="72" y="18" text-anchor="middle" fill="#22c55e" font-size="10" font-weight="600">DATABASE</text>
+            <text x="72" y="46" text-anchor="middle" fill="#e4e6ed" font-size="11.5" font-weight="600">Save to</text>
+            <text x="72" y="62" text-anchor="middle" fill="#e4e6ed" font-size="11.5" font-weight="600">Supabase</text>
+            <text x="72" y="80" text-anchor="middle" fill="#8b8fa3" font-size="9">contact_submissions</text>
+          </g>
+
+          <!-- ── Node 6: Acknowledge ── -->
+          <g transform="translate(690,315)">
+            <rect width="145" height="75" rx="10" fill="#1e2433" stroke="#8b5cf6" stroke-width="2"/>
+            <rect width="145" height="28" rx="10" fill="#8b5cf6" opacity="0.15"/>
+            <text x="72" y="18" text-anchor="middle" fill="#8b5cf6" font-size="10" font-weight="600">RESPONSE</text>
+            <text x="72" y="46" text-anchor="middle" fill="#e4e6ed" font-size="11.5" font-weight="600">Acknowledge</text>
+            <text x="72" y="62" text-anchor="middle" fill="#e4e6ed" font-size="11.5" font-weight="600">Receipt</text>
+          </g>
+        </svg>
+      </div>
+      <div class="caption">n8n workflow — 8 nodes, single endpoint, one model call</div>
+    </div>
+  </div>
+
+  <!-- ═══ INTERACTIVE FLOWCHART ═══ -->
+  <div class="section">
+    <div class="section-label">Step by Step</div>
+    <h2>How It Works</h2>
+    <p style="margin-bottom:24px;">Click each step to see implementation details.</p>
+
+    <div class="flowchart">
+      <!-- Step 1 -->
+      <div class="flow-step" onclick="toggleDetail(this)">
+        <div class="flow-connector">
+          <div class="step-num webhook">1</div>
+          <div class="connector-line"></div>
+        </div>
+        <div class="step-card">
+          <h3>Incoming Contact Form</h3>
+          <p>Webhook receives POST requests from any contact form. Accepts name, email, message, and source fields.</p>
+          <div class="step-detail">
+            Endpoint: <code>POST /webhook/contact-intake</code><br><br>
+            The webhook is configured with <code>responseMode: responseNode</code> so the workflow controls what the submitter sees. No authentication required — the endpoint is public by design. Payload is passed downstream as <code>$json.body</code>.
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="flow-step" onclick="toggleDetail(this)">
+        <div class="flow-connector">
+          <div class="step-num ai">2</div>
+          <div class="connector-line"></div>
+        </div>
+        <div class="step-card">
+          <h3>Claude Intent Classification</h3>
+          <p>Claude Sonnet analyzes the message and returns structured JSON with intent, category, urgency, summary, and confidence score.</p>
+          <div class="step-detail">
+            Uses <code>claude-sonnet-4</code> at <code>temperature: 0.1</code> for deterministic classification. The structured output parser enforces a JSON schema so downstream nodes always get predictable fields. System prompt defines 6 intent types, 10 categories, and 4 urgency levels. Single model call per submission — no chains, no retrieval, no tools.
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="flow-step" onclick="toggleDetail(this)">
+        <div class="flow-connector">
+          <div class="step-num router">3</div>
+          <div class="connector-line"></div>
+        </div>
+        <div class="step-card">
+          <h3>Priority Router</h3>
+          <p>IF node checks whether urgency is "high" or "critical". Routes to the appropriate downstream path.</p>
+          <div class="step-detail">
+            Simple boolean gate — <code>urgency == "high" OR urgency == "critical"</code>. True path triggers Slack. False path goes straight to storage. No multi-way switch needed at this scope. Easy to extend later with a Switch node for more granular routing.
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 4 -->
+      <div class="flow-step" onclick="toggleDetail(this)">
+        <div class="flow-connector">
+          <div class="step-num slack">4</div>
+          <div class="connector-line"></div>
+        </div>
+        <div class="step-card">
+          <h3>Send High Priority Slack Alert</h3>
+          <p>Posts a formatted message to a designated Slack channel with submission details and classification results.</p>
+          <div class="step-detail">
+            Message includes: submitter name/email, intent, category, and AI-generated summary. Uses Slack markdown for formatting. Links back to the n8n workflow execution for full context. Only fires for high/critical — no alert fatigue.
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 5 -->
+      <div class="flow-step" onclick="toggleDetail(this)">
+        <div class="flow-connector">
+          <div class="step-num db">5</div>
+          <div class="connector-line"></div>
+        </div>
+        <div class="step-card">
+          <h3>Save to Supabase</h3>
+          <p>Inserts the original submission plus all classification metadata into a Postgres table via Supabase.</p>
+          <div class="step-detail">
+            Table: <code>contact_submissions</code> with columns for name, email, message, intent, category, urgency, summary, and confidence. Uses Supabase's auto-generated UUID primary key and <code>created_at</code> timestamp. Data is stored for review, analytics, and potential retraining.
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 6 -->
+      <div class="flow-step" onclick="toggleDetail(this)">
+        <div class="flow-connector">
+          <div class="step-num ack">6</div>
+        </div>
+        <div class="step-card">
+          <h3>Acknowledge Receipt</h3>
+          <p>Returns a JSON response to the form submitter confirming their message was received.</p>
+          <div class="step-detail">
+            Responds with <code>200 OK</code> and a confirmation message. Keeps it simple — no classification details are exposed to the submitter. The response is instant from their perspective because the webhook waits for the full pipeline to complete before responding.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ CLASSIFICATION DEMO ═══ -->
+  <div class="section">
+    <div class="section-label">Demo</div>
+    <h2>Try the Classifier</h2>
+    <p style="margin-bottom:8px;">See how the AI would classify different types of messages. This simulates the Claude classification logic.</p>
+
+    <div class="demo-container">
+      <div class="demo-header">
+        <span class="live-dot"></span>
+        Classification Simulator
+      </div>
+      <div class="demo-body">
+        <div class="demo-input">
+          <label>Message</label>
+          <textarea id="demo-message" placeholder="Type a sample contact form message...">Hi, I was charged $49.99 twice on my last invoice. Can someone look into this ASAP? My account number is #4521.</textarea>
+        </div>
+        <button class="demo-btn" id="demo-btn" onclick="runDemo()">Classify Message</button>
+
+        <div class="demo-result" id="demo-result">
+          <div class="result-grid" id="result-grid"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ CLASSIFICATION CATEGORIES ═══ -->
+  <div class="section">
+    <div class="section-label">Classification Logic</div>
+    <h2>What Gets Classified</h2>
+
+    <div style="overflow-x:auto;">
+      <table class="decision-table">
+        <thead>
+          <tr>
+            <th>Intent</th>
+            <th>Description</th>
+            <th>Example Signal</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td style="color:var(--text)">sales_inquiry</td><td>Interested in purchasing or pricing</td><td>"How much does the pro plan cost?"</td></tr>
+          <tr><td style="color:var(--text)">support_request</td><td>Needs help with existing product</td><td>"I can't log into my account"</td></tr>
+          <tr><td style="color:var(--text)">partnership</td><td>Business collaboration proposal</td><td>"We'd love to integrate with your API"</td></tr>
+          <tr><td style="color:var(--text)">feedback</td><td>Product feedback or review</td><td>"Love the new dashboard update!"</td></tr>
+          <tr><td style="color:var(--text)">spam</td><td>Irrelevant or bot-generated</td><td>"Buy cheap supplements now!!!"</td></tr>
+          <tr><td style="color:var(--text)">general_inquiry</td><td>Doesn't fit other categories</td><td>"Do you have office hours?"</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══ TECH STACK ═══ -->
+  <div class="section">
+    <div class="section-label">Stack</div>
+    <h2>Technology</h2>
+
+    <div class="stack-grid">
+      <div class="stack-card">
+        <div class="stack-icon">&#9881;</div>
+        <h4>n8n</h4>
+        <p>Workflow orchestration. Handles the webhook, routing logic, and all integrations without custom code.</p>
+      </div>
+      <div class="stack-card">
+        <div class="stack-icon">&#129302;</div>
+        <h4>Claude Sonnet 4</h4>
+        <p>LLM classification with structured output. Low temperature for deterministic results. One call per submission.</p>
+      </div>
+      <div class="stack-card">
+        <div class="stack-icon">&#128451;</div>
+        <h4>Supabase</h4>
+        <p>Postgres database for storing submissions with classification metadata. Instant API, real-time subscriptions.</p>
+      </div>
+      <div class="stack-card">
+        <div class="stack-icon">&#128172;</div>
+        <h4>Slack</h4>
+        <p>High-priority notifications. Formatted messages with full context delivered to the right channel instantly.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SUPABASE SCHEMA ═══ -->
+  <div class="section">
+    <div class="section-label">Database</div>
+    <h2>Supabase Schema</h2>
+
+    <div class="code-block">
+      <div class="code-header">
+        <span>SQL — contact_submissions</span>
+        <button onclick="copyCode(this)">Copy</button>
+      </div>
+      <div class="code-body" id="sql-block"><span class="kw">CREATE TABLE</span> contact_submissions (
+  id          <span class="kw">uuid DEFAULT</span> gen_random_uuid() <span class="kw">PRIMARY KEY</span>,
+  created_at  <span class="kw">timestamptz DEFAULT</span> now(),
+  name        <span class="kw">text</span>,
+  email       <span class="kw">text</span>,
+  message     <span class="kw">text</span>,
+  intent      <span class="kw">text</span>,
+  category    <span class="kw">text</span>,
+  urgency     <span class="kw">text</span>,
+  summary     <span class="kw">text</span>,
+  confidence  <span class="kw">float</span>
+);</div>
+    </div>
+  </div>
+
+  <!-- ═══ DESIGN DECISIONS ═══ -->
+  <div class="section">
+    <div class="section-label">Decisions</div>
+    <h2>Why This Architecture</h2>
+    <p style="margin-bottom: 16px;">A few deliberate choices that keep this minimal and practical:</p>
+    <p><strong style="color:var(--text)">Single model call.</strong> One Claude invocation with structured output. No chains, no retrieval, no tool use. Classification doesn't need reasoning loops — it needs speed and consistency.</p>
+    <p style="margin-top:12px;"><strong style="color:var(--text)">IF node over Switch.</strong> At this scope, two paths (alert vs. store) is enough. A Switch node with 5 outputs would over-engineer the routing before there's evidence more granularity helps.</p>
+    <p style="margin-top:12px;"><strong style="color:var(--text)">Supabase over stateless.</strong> Storing submissions with their classifications creates a feedback loop. You can review accuracy, spot patterns, and eventually fine-tune the prompt with real data.</p>
+    <p style="margin-top:12px;"><strong style="color:var(--text)">No auto-replies.</strong> The agent acknowledges receipt but never responds to the actual query. Edge cases where it guesses wrong are low-cost when a human always follows up.</p>
+  </div>
+
+  <!-- ═══ OPEN QUESTIONS ═══ -->
+  <div class="section">
+    <div class="section-label">Next Steps</div>
+    <h2>Where This Could Go</h2>
+    <p>This is a v1. Some directions worth exploring as the system handles real volume:</p>
+    <p style="margin-top:12px; color:var(--text-muted)"><strong style="color:var(--text)">Confidence thresholds.</strong> If the model returns confidence below 0.7, route to a human review queue instead of auto-classifying.</p>
+    <p style="margin-top:12px; color:var(--text-muted)"><strong style="color:var(--text)">Multi-channel routing.</strong> Replace the IF node with a Switch that routes sales inquiries to a CRM, support requests to a ticketing system, and spam to /dev/null.</p>
+    <p style="margin-top:12px; color:var(--text-muted)"><strong style="color:var(--text)">Config-driven categories.</strong> Move the intent/category taxonomy to a config file or database table so non-technical users can tune it without editing the prompt.</p>
+    <p style="margin-top:12px; color:var(--text-muted)"><strong style="color:var(--text)">Analytics dashboard.</strong> Build a Supabase view that shows submission volume, category distribution, and average confidence over time.</p>
+  </div>
+
+</div>
+
+<!-- ═══ FOOTER ═══ -->
+<footer class="footer">
+  <p>Built by Matt Martelli &middot; <a href="https://n8n.growthmindsetai.tech/workflow/HlNL2L0iOBAURmLT" target="_blank">View Workflow in n8n</a></p>
+</footer>
+
+<script>
+// ── Toggle flow step details ──
+function toggleDetail(el) {
+  const detail = el.querySelector('.step-detail');
+  detail.classList.toggle('open');
+}
+
+// ── Demo classifier (simulated) ──
+const classificationRules = [
+  { keywords: ['price','cost','plan','pricing','buy','purchase','quote','demo','trial'], intent: 'sales_inquiry', category: 'pricing' },
+  { keywords: ['charge','billing','invoice','payment','refund','charged twice','overcharged'], intent: 'support_request', category: 'billing' },
+  { keywords: ['bug','error','crash','broken','not working','issue','glitch','down'], intent: 'support_request', category: 'technical' },
+  { keywords: ['login','password','account','access','locked out','can\'t sign in'], intent: 'support_request', category: 'account' },
+  { keywords: ['partner','collaborate','integrate','api','integration','joint'], intent: 'partnership', category: 'integration' },
+  { keywords: ['love','great','amazing','feedback','suggestion','feature request'], intent: 'feedback', category: 'feature_request' },
+  { keywords: ['cheap','buy now','click here','unsubscribe','winner','congratulations','free money'], intent: 'spam', category: 'other' },
+  { keywords: ['hire','job','position','resume','freelance','contract'], intent: 'general_inquiry', category: 'other' }
+];
+
+function classifyMessage(msg) {
+  const lower = msg.toLowerCase();
+  let best = { intent: 'general_inquiry', category: 'other', score: 0 };
+
+  for (const rule of classificationRules) {
+    const matches = rule.keywords.filter(kw => lower.includes(kw)).length;
+    if (matches > best.score) {
+      best = { intent: rule.intent, category: rule.category, score: matches };
+    }
+  }
+
+  // Urgency heuristics
+  let urgency = 'low';
+  const urgentSignals = ['asap','urgent','immediately','critical','down','security','charged twice','locked out'];
+  const highSignals = ['help','issue','problem','broken','can\'t','not working','refund'];
+  const hasUrgent = urgentSignals.some(s => lower.includes(s));
+  const hasHigh = highSignals.some(s => lower.includes(s));
+
+  if (hasUrgent) urgency = 'critical';
+  else if (hasHigh) urgency = 'high';
+  else if (best.intent === 'sales_inquiry') urgency = 'medium';
+
+  const confidence = Math.min(0.98, 0.65 + (best.score * 0.12));
+
+  const summaries = {
+    'support_request': 'Customer needs assistance with ' + best.category + ' issue',
+    'sales_inquiry': 'Prospect inquiring about product ' + best.category,
+    'partnership': 'Business proposing collaboration or integration',
+    'feedback': 'User sharing product feedback',
+    'spam': 'Likely spam or irrelevant submission',
+    'general_inquiry': 'General question or information request'
+  };
+
+  return {
+    intent: best.intent,
+    category: best.category,
+    urgency: urgency,
+    confidence: confidence.toFixed(2),
+    summary: summaries[best.intent] || 'Contact form submission requiring review'
+  };
+}
+
+function runDemo() {
+  const btn = document.getElementById('demo-btn');
+  const msg = document.getElementById('demo-message').value.trim();
+  if (!msg) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Classifying...';
+
+  setTimeout(() => {
+    const result = classifyMessage(msg);
+    const grid = document.getElementById('result-grid');
+
+    grid.innerHTML = `
+      <div class="result-item">
+        <div class="label">Intent</div>
+        <div class="value">${result.intent.replace('_', ' ')}</div>
+      </div>
+      <div class="result-item">
+        <div class="label">Category</div>
+        <div class="value">${result.category}</div>
+      </div>
+      <div class="result-item">
+        <div class="label">Urgency</div>
+        <div class="value"><span class="urgency-badge urgency-${result.urgency}">${result.urgency}</span></div>
+      </div>
+      <div class="result-item">
+        <div class="label">Confidence</div>
+        <div class="value">${(result.confidence * 100).toFixed(0)}%</div>
+      </div>
+      <div class="result-item" style="grid-column: 1 / -1;">
+        <div class="label">Summary</div>
+        <div class="value" style="font-weight:400; font-size:0.88rem; color:var(--text-muted)">${result.summary}</div>
+      </div>
+    `;
+
+    document.getElementById('demo-result').classList.add('show');
+    btn.disabled = false;
+    btn.textContent = 'Classify Message';
+  }, 800);
+}
+
+// ── Copy code ──
+function copyCode(btn) {
+  const block = btn.closest('.code-block').querySelector('.code-body');
+  navigator.clipboard.writeText(block.textContent).then(() => {
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+}
+</script>
+</body>
+</html>
