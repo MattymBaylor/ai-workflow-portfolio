@@ -1,0 +1,127 @@
+{
+  "name": "AI Contact Form Sorter",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "contact-intake",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Incoming Contact Form",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Classify this contact form submission:\n\nName: {{ $json.body.name }}\nEmail: {{ $json.body.email }}\nMessage: {{ $json.body.message }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a contact form classifier. Analyze each submission and return structured data.\n\nINTENT: sales_inquiry | support_request | partnership | feedback | spam | general_inquiry\nCATEGORY: billing | technical | pricing | demo_request | account | other\nURGENCY: critical | high | medium | low\nCONFIDENCE: 0.0-1.0\nSUMMARY: One sentence describing what the person needs.",
+          "maxIterations": 3
+        }
+      },
+      "name": "Claude Intent Classification",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [560, 300]
+    },
+    {
+      "parameters": {
+        "model": { "__rl": true, "mode": "id", "value": "claude-sonnet-4-20250514" },
+        "options": { "baseURL": "https://api.anthropic.com/v1", "temperature": 0.1 }
+      },
+      "name": "Claude via API",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [560, 500]
+    },
+    {
+      "parameters": {
+        "schemaType": "fromJson",
+        "jsonSchemaExample": "{ \"intent\": \"support_request\", \"category\": \"billing\", \"urgency\": \"high\", \"summary\": \"Customer reports duplicate billing charge\", \"confidence\": 0.92 }"
+      },
+      "name": "Classification Schema",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [720, 500]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            { "leftValue": "={{ $json.urgency }}", "rightValue": "high", "operator": { "type": "string", "operation": "equals" } },
+            { "leftValue": "={{ $json.urgency }}", "rightValue": "critical", "operator": { "type": "string", "operation": "equals" } }
+          ],
+          "combinator": "or"
+        }
+      },
+      "name": "Priority Router",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": { "__rl": true, "mode": "id", "value": "YOUR_CHANNEL_ID" },
+        "messageType": "text",
+        "text": "=*High Priority Submission*\n*From:* {{ $(\"Incoming Contact Form\").item.json.body.name }}\n*Intent:* {{ $json.intent }} | *Category:* {{ $json.category }}\n*Summary:* {{ $json.summary }}",
+        "otherOptions": { "includeLinkToWorkflow": true }
+      },
+      "name": "Send High Priority Slack Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [1180, 200]
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "tableId": "contact_submissions",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "name", "fieldValue": "={{ $(\"Incoming Contact Form\").item.json.body.name }}" },
+            { "fieldId": "email", "fieldValue": "={{ $(\"Incoming Contact Form\").item.json.body.email }}" },
+            { "fieldId": "message", "fieldValue": "={{ $(\"Incoming Contact Form\").item.json.body.message }}" },
+            { "fieldId": "intent", "fieldValue": "={{ $json.intent }}" },
+            { "fieldId": "category", "fieldValue": "={{ $json.category }}" },
+            { "fieldId": "urgency", "fieldValue": "={{ $json.urgency }}" },
+            { "fieldId": "summary", "fieldValue": "={{ $json.summary }}" },
+            { "fieldId": "confidence", "fieldValue": "={{ $json.confidence }}" }
+          ]
+        }
+      },
+      "name": "Save to Supabase",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1180, 420]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"status\": \"received\", \"message\": \"Thank you for your submission. We will get back to you shortly.\" }",
+        "options": { "responseCode": 200 }
+      },
+      "name": "Acknowledge Receipt",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [1480, 420]
+    }
+  ],
+  "connections": {
+    "Incoming Contact Form": { "main": [[{ "node": "Claude Intent Classification", "type": "main", "index": 0 }]] },
+    "Claude Intent Classification": { "main": [[{ "node": "Priority Router", "type": "main", "index": 0 }]] },
+    "Claude via API": { "ai_languageModel": [[{ "node": "Claude Intent Classification", "type": "ai_languageModel", "index": 0 }]] },
+    "Classification Schema": { "ai_outputParser": [[{ "node": "Claude Intent Classification", "type": "ai_outputParser", "index": 0 }]] },
+    "Priority Router": { "main": [ [{ "node": "Send High Priority Slack Alert", "type": "main", "index": 0 }], [{ "node": "Save to Supabase", "type": "main", "index": 0 }] ] },
+    "Save to Supabase": { "main": [[{ "node": "Acknowledge Receipt", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}
